@@ -21,5 +21,12 @@
 > https://jfrog.com/artifactory/
 
 > GONOPROXY
+> GONOSUM
+> GOPRIVATE
 
 > export GONOPROXY="github.com"
+> export GOPRIVATE="github.com"
+
+> MVS 
+
+> go mod vendor
