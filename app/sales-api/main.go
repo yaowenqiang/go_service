@@ -6,6 +6,7 @@ import (
     "fmt"
     "expvar"
     "net/http"
+    _ "net/http/pprof"
 
     "github.com/pkg/errors"
     "github.com/dimfeld/httptreemux/v5"
@@ -79,6 +80,26 @@ func run(log *log.Logger) error{
 		return errors.Wrap(err, "generating config for output")
 	}
 	log.Printf("main: Config :\n%v\n", out)
+
+
+	// =========================================================================
+	// Start Debug Service
+	//
+	// /debug/pprof - Added to the default mux by importing the net/http/pprof package.
+	// /debug/vars - Added to the default mux by importing the expvar package.
+	//
+	// Not concerned with shutting this down when the application is shutdown.
+
+	log.Println("main: Initializing debugging support")
+
+	go func() {
+		log.Printf("main: Debug Listening %s", cfg.Web.DebugHost)
+		if err := http.ListenAndServe(cfg.Web.DebugHost, http.DefaultServeMux); err != nil {
+			log.Printf("main: Debug Listener closed : %v", err)
+		}
+	}()
+
+	select {}
 
 		m := httptreemux.NewContextMux()
 		m.Handle(http.MethodGet, "/test", nil)
