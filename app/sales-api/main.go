@@ -14,6 +14,7 @@ import (
     "github.com/pkg/errors"
     "github.com/dimfeld/httptreemux/v5"
 	"github.com/ardanlabs/conf"
+	"github.com/yaowenqiang/service/app/sales-api/handlers"
 )
 
 /*
@@ -126,7 +127,7 @@ func run(log *log.Logger) error{
 
 	api := http.Server{
 		Addr:         cfg.Web.APIHost,
-		//Handler:      handlers.API(build, shutdown, log, auth, db),
+		Handler:      handlers.API(build, shutdown, log),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
 	}
