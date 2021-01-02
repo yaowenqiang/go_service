@@ -6,6 +6,7 @@ import (
     "os"
     "log"
     "net/http"
+    "github.com/yaowenqiang/service/business/mid"
     "github.com/yaowenqiang/service/foundation/web"
 )
 
@@ -13,7 +14,7 @@ import (
 // API constructs an http.Handler with all application routes defined.
 func API(build string, shutdown chan os.Signal, log *log.Logger)  *web.App {
 
-    app := web.NewApp(shutdown)
+    app := web.NewApp(shutdown, mid.Logger(log))
     c := check{
         Log: log,
     }
