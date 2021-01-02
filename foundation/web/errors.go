@@ -15,7 +15,7 @@ type ErrorResponse struct {
 }
 
 type Error struct {
-    err error
+    Err error
     Status int
     Fields []FieldError
 }
@@ -26,7 +26,7 @@ func NewRequestError(err error, status int) error {
 
 
 func (err *Error) Error() string {
-    return err. err.Error()
+    return err.Err.Error()
 }
 
 type shutdown struct {
