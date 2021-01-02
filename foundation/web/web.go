@@ -3,10 +3,23 @@ package web
 import (
     "context"
     "syscall"
+    "time"
     "os"
     "net/http"
     "github.com/dimfeld/httptreemux/v5"
+    "github.com/google/uuid"
 )
+
+type ctxKey int
+
+const KeyValues ctxKey = 1
+
+type Values struct {
+    TraceID string
+    Now time.Time
+    StatusCode int
+}
+
 
 type App struct {
     *httptreemux.ContextMux
@@ -27,7 +40,15 @@ func (a *App) Handle(method string, path string, handler Handler) {
     h := func(w http.ResponseWriter, r *http.Request) {
         //BOILERPLAE
 
-        if err := handler(r.Context(), w, r); err != nil {
+        v := Values{
+            TraceID: uuid.New().String(),
+            Now: time.Now(),
+        }
+
+        ctx := context.WithValue(r.Context(), KeyValues, &v)
+
+
+        if err := handler(ctx, w, r); err != nil {
             a.SignalShutdown()
             return
         }
