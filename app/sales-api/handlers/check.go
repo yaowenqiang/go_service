@@ -21,7 +21,7 @@ func (c check) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Re
     } else {
         //return web.NewRequestError(errors.New("tusted error"), http.StatusNotFound)
         //return web.NewRequestError(errors.New("tusted error"), http.StatusNotFound)
-        panic("forcing panic")
+        //panic("forcing panic")
         //return web.NewShutdownError("forcing shutdown")
 
     }

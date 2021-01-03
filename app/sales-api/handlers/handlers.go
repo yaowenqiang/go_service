@@ -8,18 +8,19 @@ import (
     "net/http"
     "github.com/yaowenqiang/service/business/mid"
     "github.com/yaowenqiang/service/foundation/web"
+    "github.com/yaowenqiang/service/business/auth"
 )
 
 
 // API constructs an http.Handler with all application routes defined.
-func API(build string, shutdown chan os.Signal, log *log.Logger) *web.App {
+func API(build string, shutdown chan os.Signal, log *log.Logger, a *auth.Auth) *web.App {
 
     app := web.NewApp(shutdown, mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panic(log))
     c := check{
         Log: log,
     }
 
-    app.Handle(http.MethodGet, "/readiness",c.readiness)
+    app.Handle(http.MethodGet, "/readiness",c.readiness, mid.Authenticate(a), mid.Authorize(log, auth.RoleAdmin))
     return app
 }
 

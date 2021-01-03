@@ -1,5 +1,6 @@
 package main
 import (
+    "crypto/rsa"
     "log"
     "os"
     "time"
@@ -7,6 +8,7 @@ import (
     "context"
     "syscall"
     "fmt"
+    "io/ioutil"
     "expvar"
     "net/http"
     _ "net/http/pprof"
@@ -15,6 +17,8 @@ import (
     "github.com/dimfeld/httptreemux/v5"
 	"github.com/ardanlabs/conf"
 	"github.com/yaowenqiang/service/app/sales-api/handlers"
+	"github.com/yaowenqiang/service/business/auth"
+    "github.com/dgrijalva/jwt-go"
 )
 
 /*
@@ -49,6 +53,11 @@ func run(log *log.Logger) error{
 			ReadTimeout     time.Duration `conf:"default:5s"`
 			WriteTimeout    time.Duration `conf:"default:5s,noprint"`
 			ShutdownTimeout time.Duration `conf:"default:5s"`
+		}
+		Auth struct {
+			KeyID         		string        `conf:"default:asdlfjldasjfdsjfldasjfl jlsjflweqjio;ewjejf"`
+			PrivateKeyFile      string        `conf:"default:private.pem"`
+			Algorithm     		string 		  `conf:"default:RS256"`
 		}
 	}
 
@@ -94,6 +103,39 @@ func run(log *log.Logger) error{
 	log.Printf("main: Config :\n%v\n", out)
 
 
+
+	// =========================================================================
+	// Initializing authentication support
+
+	log.Println("main: Started : Intializing authentication support")
+
+	privatePEM, err := ioutil.ReadFile(cfg.Auth.PrivateKeyFile)
+
+	if err != nil {
+		return errors.Wrap(err, "reading auth private key")
+	}
+
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privatePEM)
+
+
+	if err != nil {
+		return errors.Wrap(err, "parsing auth private key")
+	}
+
+	lookup := func(kid string) (*rsa.PublicKey, error) {
+		switch kid {
+		case cfg.Auth.KeyID:
+			return &privateKey.PublicKey, nil
+		}
+
+		return nil, fmt.Errorf("no public key found for the specified kid: %s", kid)
+	}
+
+	auth, err  := auth.New(cfg.Auth.Algorithm, lookup, auth.Keys{cfg.Auth.KeyID: privateKey})
+
+	if err != nil {
+		return errors.Wrap(err, "constructing auth")
+	}
 	// =========================================================================
 	// Start Debug Service
 	//
@@ -127,7 +169,7 @@ func run(log *log.Logger) error{
 
 	api := http.Server{
 		Addr:         cfg.Web.APIHost,
-		Handler:      handlers.API(build, shutdown, log),
+		Handler:      handlers.API(build, shutdown, log, auth),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
 	}
