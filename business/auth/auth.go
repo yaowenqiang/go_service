@@ -13,7 +13,7 @@ const (
 
 type ctxKey int
 
-type Key ctxKey = 1
+const Key ctxKey = 1
 
 
 type Claims struct {
@@ -36,25 +36,25 @@ type Keys map[string]*rsa.PrivateKey
 
 
 //see https://auth0.com/docs/jwks
-type PublicKeyLookup func(kid string) (*rsa.PublicKey, err)
+type PublicKeyLookup func(kid string) (*rsa.PublicKey, error)
 
 
 
-type auth struct {
+type Auth struct {
     algorithm string
-    keyFunc func(t *jwt.Token) (interface{}, error)
+    KeyFunc func(t *jwt.Token) (interface{}, error)
     parser *jwt.Parser
-    keys Keys
+    Keys Keys
 }
 
 
 func New(algorithm string, lookup PublicKeyLookup, keys Keys) (*Auth, error) {
-    if jwt.SetSigningMethod(algorithm) == nil {
+    if jwt.GetSigningMethod(algorithm) == nil {
         return nil, errors.Errorf("unknown algorithm %v", algorithm)
     }
 
     keyFunc := func(t *jwt.Token) (interface{}, error) {
-        kid, ok := t.Header['kid']
+        kid, ok := t.Header["kid"]
         if !ok {
             return nil, errors.New("missing kye id(kid) in token header")
         }
@@ -69,12 +69,12 @@ func New(algorithm string, lookup PublicKeyLookup, keys Keys) (*Auth, error) {
     }
 
     parser := jwt.Parser{
-        ValidMethod: []string{algorithm},
+        ValidMethods: []string{algorithm},
     }
 
     a := Auth{
         algorithm: algorithm,
-        keyFunc: keyFuncm
+        KeyFunc: keyFunc,
         parser: &parser,
         Keys: keys,
     }
@@ -84,7 +84,7 @@ func New(algorithm string, lookup PublicKeyLookup, keys Keys) (*Auth, error) {
 }
 
 func (a *Auth) AddKey(privateKey *rsa.PrivateKey, Kid string){
-    a.Keys[kid] = privateKey
+    a.Keys[Kid] = privateKey
 }
 
 func (a *Auth) RemoveKey(kid string) {
@@ -118,10 +118,10 @@ func (a *Auth) GenerateToken(kid string, claims Claims) (string, error) {
 func (a *Auth) ValidateToken(tokenStr string) (Claims, error) {
     var claims Claims
 
-    token, err := a.parser.parseWithClaims(tokenStr, &claims, a.KeyFunc)
+    token, err := a.parser.ParseWithClaims(tokenStr, &claims, a.KeyFunc)
 
     if err != nil {
-        return Claims{}, errors.Wrap("parsing token")
+        return Claims{}, errors.Wrap(err, "parsing token")
     }
 
     if !token.Valid {

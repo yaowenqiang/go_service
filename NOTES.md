@@ -31,3 +31,6 @@
 
 > go mod vendor
 > go get github.com/divan/expvarmon
+
+> brew install  staticcheck
+
