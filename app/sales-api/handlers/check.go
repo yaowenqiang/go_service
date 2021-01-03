@@ -19,7 +19,11 @@ func (c check) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Re
     if m := rand.Intn(100); m % 2 == 0 {
         return errors.New("untrusted error")
     } else {
-        return web.NewRequestError(errors.New("tusted error"), http.StatusNotFound)
+        //return web.NewRequestError(errors.New("tusted error"), http.StatusNotFound)
+        //return web.NewRequestError(errors.New("tusted error"), http.StatusNotFound)
+        panic("forcing panic")
+        //return web.NewShutdownError("forcing shutdown")
+
     }
         status := struct {
             Status string
