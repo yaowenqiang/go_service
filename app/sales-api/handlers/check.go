@@ -18,6 +18,8 @@ type check struct {
 func (c check) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Request)  error {
     if m := rand.Intn(100); m % 2 == 0 {
         return errors.New("untrusted error")
+    } else {
+        return web.NewRequestError(errors.New("tusted error"), http.StatusNotFound)
     }
         status := struct {
             Status string

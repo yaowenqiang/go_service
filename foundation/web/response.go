@@ -37,7 +37,7 @@ func Respond(ctx context.Context, w http.ResponseWriter,  data interface{}, stat
 
 }
 
-func RespondError(ctx context.Context, w http.ResponseWriter, err *Error) error {
+func RespondError(ctx context.Context, w http.ResponseWriter, err error) error {
     if webErr, ok := errors.Cause(err).(*Error); ok {
         er := ErrorResponse{
             Error: webErr.Err.Error(),
