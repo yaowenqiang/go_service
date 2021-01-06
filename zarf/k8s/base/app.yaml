@@ -1,0 +1,90 @@
+apiVersion: app/v1
+kind: Deployment
+metadata:
+    name: sales-api
+spec:
+    selector:
+        matchLabels:
+            app: sales-api
+    template:
+        metadata:
+            labels:
+                app: sales-api
+        spec:
+            dnsPolicy: ClusterFirstWithHostNet
+            hostNetwork: true
+            containers:
+            - name: zipkin
+              image: openzipkin/zipkin:2.21
+              ports:
+              - name: zipkin
+                containerPort: 9411
+            - name: app
+              image: sales-api-amd64:1.0
+              env:
+              - name: SALES_DB_HOST
+                valueFrom:
+                    configMapKeyRef:
+                        name: app-config
+                        key: db_host
+              - name: SALES_ZIPKIN_REPORTER_URI
+                valueFrom:
+                    configMapKeyRef:
+                        name: app-config
+                        key: zipkin_reporter_uri
+              - name: KUBERNETES_NAMESPACE
+                valueFrom:
+                    fieldRef:
+                        fieldPath: metadata.namespace
+              - name: KUBERNETES_PODNAME
+                valueFrom:
+                    fieldRef:
+                        fieldPath: metadata.podname
+              - name: KUBERNETES_NAMESPACE_POD_IP
+                valueFrom:
+                    fieldRef:
+                        fieldPath: status.podIP
+              - name: KUBERNETES_NODENAME
+                valueFrom:
+                    fieldRef:
+                        fieldPath: spec.nodeName
+            ports:
+            - name: app
+              containerPorts: 3000
+            - name: app-debug
+              containerPorts: 4000
+            readinessProbe:
+                httpSet:
+                    path: /readiness
+                    port: 3000
+                initialDelaySeconds: 30
+                periodSeconds: 15
+            livenessProbe:
+                httpGet:
+                    path: /liveness
+                    port: 3000
+                initialDelaySeconds: 30
+                periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: sales-api
+spec:
+    selector:
+        service: sales-api
+    pots:
+    - name: zipkin
+      ports: 9411
+      targetPort: app
+    - name: app
+      ports: 3000
+      targetPort: app
+    - name: app-debug
+      ports: 4000
+      targetPort: app-debug
+
+
+
+
+
