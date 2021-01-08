@@ -17,6 +17,7 @@ func API(build string, shutdown chan os.Signal, log *log.Logger, a *auth.Auth) *
 
     app := web.NewApp(shutdown, mid.Logger(log), mid.Errors(log), mid.Metrics(), mid.Panic(log))
     c := check{
+        build: build,
         Log: log,
     }
 
