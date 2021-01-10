@@ -18,6 +18,7 @@ import (
 	"github.com/ardanlabs/conf"
 	"github.com/yaowenqiang/service/app/sales-api/handlers"
 	"github.com/yaowenqiang/service/business/auth"
+	"github.com/yaowenqiang/service/foundation/database"
     "github.com/dgrijalva/jwt-go"
 )
 
@@ -53,6 +54,13 @@ func run(log *log.Logger) error{
 			ReadTimeout     time.Duration `conf:"default:5s"`
 			WriteTimeout    time.Duration `conf:"default:5s,noprint"`
 			ShutdownTimeout time.Duration `conf:"default:5s"`
+		}
+		DB struct {
+			User         	string        `conf:"default:postgres"`
+			Password        string        `conf:"default:postgres, noprint"`
+			Host         	string        `conf:"default:db"`
+			Name         	string        `conf:"default:postgres"`
+			DisableTLS      bool          `conf:"default:true"`
 		}
 		Auth struct {
 			KeyID         		string        `conf:"default:asdlfjldasjfdsjfldasjfl jlsjflweqjio;ewjejf"`
@@ -137,12 +145,34 @@ func run(log *log.Logger) error{
 		return errors.Wrap(err, "constructing auth")
 	}
 	// =========================================================================
-	// Start Debug Service
+	// Start Database
+	log.Println("main: Intializing database support")
+	db, err := database.Open(database.Config{
+		User: cfg.DB.User,
+		Password: cfg.DB.Password,
+		Host: cfg.DB.Host,
+		Name: cfg.DB.Name,
+		DisableTLS: cfg.DB.DisableTLS,
+	})
+
+	if err != nil {
+		return errors.Wrap(err, "connecting to db")
+	}
+
+	defer func() {
+		log.Printf("main: database Stopping: %s", cfg.DB.Host)
+		db.Close()
+	}()
+
+
+
+	// =========================================================================
+	// start debug service
 	//
-	// /debug/pprof - Added to the default mux by importing the net/http/pprof package.
-	// /debug/vars - Added to the default mux by importing the expvar package.
+	// /debug/pprof - added to the default mux by importing the net/http/pprof package.
+	// /debug/vars - added to the default mux by importing the expvar package.
 	//
-	// Not concerned with shutting this down when the application is shutdown.
+	// not concerned with shutting this down when the application is shutdown.
 
 	log.Println("main: Initializing debugging support")
 
@@ -169,7 +199,7 @@ func run(log *log.Logger) error{
 
 	api := http.Server{
 		Addr:         cfg.Web.APIHost,
-		Handler:      handlers.API(build, shutdown, log, auth),
+		Handler:      handlers.API(build, shutdown, log, auth, db),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
 	}

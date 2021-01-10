@@ -7,17 +7,20 @@ import (
     "net/http"
     _ "github.com/pkg/errors"
     "github.com/yaowenqiang/service/foundation/web"
+    "github.com/yaowenqiang/service/foundation/database"
+    "github.com/jmoiron/sqlx"
 )
 
 
-type check struct {
+type checkGroup struct {
     build string
+	db *sqlx.DB
     Log *log.Logger
 }
 
 
 //func (c check) readiness(ctx context.Context, w http.ResponseWriter, r *http.Request) error  {
-func (c check) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Request)  error {
+func (cg checkGroup) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Request)  error {
     //if m := rand.Intn(100); m % 2 == 0 {
         //return errors.New("untrusted error")
     //} else {
@@ -27,12 +30,27 @@ func (c check) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Re
         //return web.NewShutdownError("forcing shutdown")
 
     //}
-        status := struct {
+        /*status := struct {
             Status string
         }{
             Status: "OK",
-        }
-        return web.Respond(ctx, w, status, http.StatusOK)
+        }*/
+
+		status := "OK"
+		statusCode := http.StatusOK
+
+		if err := database.StatusCheck(ctx, cg.db); err != nil {
+			status = "db not ready"
+			statusCode = http.StatusInternalServerError
+		}
+
+		health := struct {
+			status string  `json:"status"`
+		}{
+			status: status,
+		}
+
+        return web.Respond(ctx, w, health, statusCode)
 }
 
 
@@ -40,7 +58,7 @@ func (c check) readiness(ctx context.Context,  w http.ResponseWriter, r *http.Re
 // app is deployed to a kubernetes cluster, it will also return pod, node, and
 // namespace details via the Downard API. The Kubernetes environment variables
 // need to be set within your Pod/Deployment manifest.
-func (c check) liveness(ctx context.Context,  w http.ResponseWriter, r *http.Request)  error {
+func (cg checkGroup) liveness(ctx context.Context,  w http.ResponseWriter, r *http.Request)  error {
 
     host, err := os.Hostname()
     if err != nil {
@@ -57,7 +75,7 @@ func (c check) liveness(ctx context.Context,  w http.ResponseWriter, r *http.Req
 		Namespace string `json:"namespace,omitempty"`
 	}{
 		Status:    "up",
-		Build:     c.build,
+		Build:     cg.build,
 		Host:      host,
 		Pod:       os.Getenv("KUBERNETES_PODNAME"),
 		PodIP:     os.Getenv("KUBERNETES_NAMESPACE_POD_IP"),

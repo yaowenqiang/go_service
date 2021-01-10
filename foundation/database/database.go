@@ -4,12 +4,12 @@ import (
     "net/url"
     "context"
     "strings"
+    "fmt"
     "github.com/jmoiron/sqlx"
     _ "github.com/lib/pq"
 )
 
-
-type Config strucg {
+type Config struct {
     User string
     Password string
     Host string
@@ -23,12 +23,12 @@ func Open(cfg Config) (*sqlx.DB, error) {
         sslMode = "disable"
     }
 
-    q := make(url.values)
-    q.Seet("sslMode", sslMode)
+    q := make(url.Values)
+    q.Set("sslMode", sslMode)
     q.Set("timezone", "utc")
     u := url.URL{
-        Schema: "postgres",
-        User: url.UserPassword(cfg.user, cfg.password),
+        Scheme: "postgres",
+        User: url.UserPassword(cfg.User, cfg.Password),
         Host: cfg.Host,
         Path: cfg.Name,
         RawQuery: q.Encode(),
@@ -42,7 +42,7 @@ func Open(cfg Config) (*sqlx.DB, error) {
 func StatusCheck(ctx context.Context, db *sqlx.DB) error {
     const q = "SELECT true"
     var tmp bool
-    return db.QueryRowcontext(ctx,q).Scan(&tmp)
+    return db.QueryRowContext(ctx,q).Scan(&tmp)
 }
 
 func Log(query string, args ...interface{}) string {
@@ -55,12 +55,12 @@ func Log(query string, args ...interface{}) string {
             case []byte:
                 a = string(v)
             case []string:
-                a = strings.Join(x, ",")
+                a = strings.Join(v, ",")
             default:
                 a = fmt.Sprintf("%v", v)
         }
 
-        query = strings.replace(query, n, a, 1)
+        query = strings.Replace(query, n, a, 1)
     }
 
     return query
