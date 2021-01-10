@@ -28,7 +28,7 @@ kind-up:
 	kind create cluster --image kindest/node:v1.19.4 --name ardan-starter-cluster --config zarf/k8s/dev/kind-config.yaml
 
 kind-down:
-	kind delete cluster --name ardan-starter-cluster --config zarf/k8s/dev/kind-config.yaml
+	kind delete cluster --name ardan-starter-cluster
 
 kind-load:
 	kind load docker-image sales-api-amd64:1.0 --name ardan-starter-cluster
