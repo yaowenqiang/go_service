@@ -1,53 +1,52 @@
 package user
 
 import (
-    "github.com/jmoiron/sqlx"
-    "github.com/pkg/errors"
-    "time"
-	"golang.org/x/crypto/bcrypt"
+	"context"
 	"github.com/google/uuid"
-
-}
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
+	"log"
+	"time"
+)
 
 var (
-    ErrNotFound = errors.New("not found")
+	ErrNotFound = errors.New("not found")
 
-    ErrInvalidID = errors.New("ID is not in its proper form")
+	ErrInvalidID = errors.New("ID is not in its proper form")
 
-    ErrAuthenticationFailure = errors.New("authentication failed")
+	ErrAuthenticationFailure = errors.New("authentication failed")
 
-    ErrForbidden = errors.New("attempted action is not allowed")
-}
-
+	ErrForbidden = errors.New("attempted action is not allowed")
+)
 
 type User struct {
-    log *log.Logger
-    db *sqlx.DB
+	log *log.Logger
+	db  *sqlx.DB
 }
 
 func New(log *log.Logger, db *sqlx.DB) User {
-    return User{
-        log: log,
-        db: db,
-    }
+	return User{
+		log: log,
+		db:  db,
+	}
 }
 
 func (u User) Create(ctx context.Context, traceID string, nu NewUser, now time.Time) (Info, error) {
-    hash, err := bcrypt.GenerateFromPassword([]byte(nu.Password), bcrypt.DefaultCost)
-    if err != nil {
-        return Info{}, errors.Wrap(err, "Generationg password hash")
-    }
+	hash, err := bcrypt.GenerateFromPassword([]byte(nu.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return Info{}, errors.Wrap(err, "Generationg password hash")
+	}
 
-    usr := Info{
-        ID: uuid.New().String(),
-        Name: nu.Name,
-        Email: nu.Email,
-        PasswordHash: hash,
-        Roles: nu.Roles,
-        DateCreated: now.UTC(),
-        DateUpdated: now.UTC(),
-    }
-
+	usr := Info{
+		ID:           uuid.New().String(),
+		Name:         nu.Name,
+		Email:        nu.Email,
+		PasswordHash: hash,
+		Roles:        nu.Roles,
+		DateCreated:  now.UTC(),
+		DateUpdated:  now.UTC(),
+	}
 
 	const q = `
 	INSERT INTO users
@@ -67,10 +66,10 @@ func (u User) Create(ctx context.Context, traceID string, nu NewUser, now time.T
 }
 
 func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, userID string, uu NewUser, now time.Time) error {
-    usr, err := u.QueryByID(ctx, traceID, claims, userID)
-    if err != nil {
-        return  err
-    }
+	usr, err := u.QueryByID(ctx, traceID, claims, userID)
+	if err != nil {
+		return err
+	}
 
 	if uu.Name != nil {
 		usr.Name = *uu.Name
@@ -90,8 +89,6 @@ func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, us
 		usr.PasswordHash = pw
 	}
 	usr.DateUpdated = now
-
-
 
 	const q = `
 	Update  users set
@@ -147,14 +144,13 @@ func (u User) Query(ctx context.Context, traceId string) ([]Info, error) {
 	return users, nil
 }
 
-
-func (u User) QueryByID(ctx context.Context, traceId string, claims auth.Claims, userID string ) (Info, error) {
+func (u User) QueryByID(ctx context.Context, traceId string, claims auth.Claims, userID string) (Info, error) {
 
 	if _, err := uuid.Parse(userID); err != nil {
 		return Info{}, ErrInvalidID
 	}
 
-	if !claims.Authrized(auth.RoleAd in) && claims.Subject != userID {
+	if !claims.Authrized(auth.RoleAdmin) && claims.Subject != userID {
 		return INfo{}, ErrForbidden
 	}
 
@@ -175,8 +171,7 @@ func (u User) QueryByID(ctx context.Context, traceId string, claims auth.Claims,
 	return usr, nil
 }
 
-func (u User) QueryByEmail(ctx context.Context, traceId string, claims auth.Claims, email string ) (Info, error) {
-
+func (u User) QueryByEmail(ctx context.Context, traceId string, claims auth.Claims, email string) (Info, error) {
 
 	const q = "SELECT * FROM users where email = %1"
 	u.log.Printf("%s : %s : query : %s", traceID, "user.QueryByEmail",
@@ -192,7 +187,7 @@ func (u User) QueryByEmail(ctx context.Context, traceId string, claims auth.Clai
 		return Info{}, errors.Wrap(err, "selecting user %q", email)
 	}
 
-	if !claims.Authrized(auth.RoleAd in) && claims.Subject != usr.ID {
+	if !claims.Authrized(auth.RoleAdmin) && claims.Subject != usr.ID {
 		return INfo{}, ErrForbidden
 	}
 
