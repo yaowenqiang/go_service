@@ -2,10 +2,13 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
+	"github.com/yaowenqiang/service/foundation/database"
+	"github.com/yaowenqiang/service/business/auth"
 	"log"
 	"time"
 )
@@ -58,14 +61,14 @@ func (u User) Create(ctx context.Context, traceID string, nu NewUser, now time.T
 		database.Log(q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.Roles, usr.DateCreated, usr.DateUpdated),
 	)
 
-	if _, err = u.db.ExecContext(ctx, q, usr.Id, usr.Name, usr.Email, usr.PasswordHash, usr.DateCreated, usr.DateUpdated); err != nil {
+	if _, err = u.db.ExecContext(ctx, q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.DateCreated, usr.DateUpdated); err != nil {
 		return Info{}, errors.Wrap(err, "inserting user")
 	}
 
 	return usr, nil
 }
 
-func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, userID string, uu NewUser, now time.Time) error {
+func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, userID string, uu UpdateUser, now time.Time) error {
 	usr, err := u.QueryByID(ctx, traceID, claims, userID)
 	if err != nil {
 		return err
@@ -78,7 +81,7 @@ func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, us
 		usr.Email = *uu.Email
 	}
 	if uu.Roles != nil {
-		usr.Roles = *uu.Roles
+		usr.Roles = uu.Roles
 	}
 	if uu.Password != nil {
 		pw, err := bcrypt.GenerateFromPassword([]byte(*uu.Password), bcrypt.DefaultCost)
@@ -104,8 +107,8 @@ func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, us
 		database.Log(q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.Roles, usr.DateUpdated),
 	)
 
-	if _, err = u.db.ExecContext(ctx, q, usr.Id, usr.Name, usr.Email, usr.PasswordHash, usr.DateUpdated); err != nil {
-		return Info{}, errors.Wrap(err, "inserting user")
+	if _, err = u.db.ExecContext(ctx, q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.DateUpdated); err != nil {
+		return errors.Wrap(err, "inserting user")
 	}
 
 	return nil
@@ -119,7 +122,7 @@ func (u User) Delete(ctx context.Context, traceID string, userID string) error {
 	const q = "DELETE from users where user_id = $1"
 
 	u.log.Printf("%s : %s : query : %s", traceID, "user.Delete",
-		database.Log(q, usr.ID),
+		database.Log(q, userID),
 	)
 
 	if _, err := u.db.ExecContext(ctx, q, userID); err != nil {
@@ -129,7 +132,7 @@ func (u User) Delete(ctx context.Context, traceID string, userID string) error {
 	return nil
 }
 
-func (u User) Query(ctx context.Context, traceId string) ([]Info, error) {
+func (u User) Query(ctx context.Context, traceID string) ([]Info, error) {
 	const q = "SELECT * FROM users"
 	u.log.Printf("%s : %s : query : %s", traceID, "user.Query",
 		database.Log(q),
@@ -144,14 +147,14 @@ func (u User) Query(ctx context.Context, traceId string) ([]Info, error) {
 	return users, nil
 }
 
-func (u User) QueryByID(ctx context.Context, traceId string, claims auth.Claims, userID string) (Info, error) {
+func (u User) QueryByID(ctx context.Context, traceID string, claims auth.Claims, userID string) (Info, error) {
 
 	if _, err := uuid.Parse(userID); err != nil {
 		return Info{}, ErrInvalidID
 	}
 
-	if !claims.Authrized(auth.RoleAdmin) && claims.Subject != userID {
-		return INfo{}, ErrForbidden
+	if !claims.Authorized(auth.RoleAdmin) && claims.Subject != userID {
+		return Info{}, ErrForbidden
 	}
 
 	const q = "SELECT * FROM users where user_id = %1"
@@ -171,7 +174,7 @@ func (u User) QueryByID(ctx context.Context, traceId string, claims auth.Claims,
 	return usr, nil
 }
 
-func (u User) QueryByEmail(ctx context.Context, traceId string, claims auth.Claims, email string) (Info, error) {
+func (u User) QueryByEmail(ctx context.Context, traceID string, claims auth.Claims, email string) (Info, error) {
 
 	const q = "SELECT * FROM users where email = %1"
 	u.log.Printf("%s : %s : query : %s", traceID, "user.QueryByEmail",
@@ -184,11 +187,11 @@ func (u User) QueryByEmail(ctx context.Context, traceId string, claims auth.Clai
 		if err == sql.ErrNoRows {
 			return Info{}, ErrNotFound
 		}
-		return Info{}, errors.Wrap(err, "selecting user %q", email)
+		return Info{}, errors.Wrapf(err, "selecting user %q", email)
 	}
 
-	if !claims.Authrized(auth.RoleAdmin) && claims.Subject != usr.ID {
-		return INfo{}, ErrForbidden
+	if !claims.Authorized(auth.RoleAdmin) && claims.Subject != usr.ID {
+		return Info{}, ErrForbidden
 	}
 
 	return usr, nil
