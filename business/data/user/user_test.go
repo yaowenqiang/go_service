@@ -1,114 +1,112 @@
-package user
+package user_test
 
 import (
     "testing"
-    "bytes"
-    "net"
-    "os/exec"
-    "encoding/json"
+    "github.com/yaowenqiang/service/business/tests"
+    "github.com/google/go-cmp/cmp"
 )
 
-type Container struct {
-    ID string
-    Host string // IP:Port
-}
+
+func TestUser(t *testing.T) {
+    log, db, teardown := tests.NewUnit()
+    t.Cleanup(teardown)
+
+    u := user.New(log, db)
+
+    t.Log("Given the need to work with User records.")
+    {
+        testID := 0
+        t.Logf("\tTest %d:\twhen handling a single User.", testID)
+        {
+            ctx := tests.Context()
+            now := time.Date(2018, time.October, 1, 0, 0, 0, 0, time.UTC)
+            traceID := "0"
+
+            nu := user.NewUser{
+                Name: "jack yao",
+                Email: "yaowenqiang1111@163.com",
+                Roles: []string{auth.RoleAdmin},
+                Password: "gophers",
+                passwordConfirm: "gophers"
+            }
+
+            usr, err := u.Create(ctx, traceID, nu, now)
+            if err != nil {
+                t.Fataf("\t%s\tTest %d:\tShould be able to create user : %s", tests.Failed, testId, err)
+            }
+            t.Logf("\t%s\tTest %d:\tShould be able to create user", tests.Failed, testId)
+
+            claims := auth.Claims{
+                StandardClaims: jwt.StandardClaims{
+                    Issuer: "service project",
+                    Subject: usr.ID,
+                    Audience: "students",
+                    ExpiresAt: now.Add(time.Hour).Unix(),
+                    IssuedAt: now.Unix(),
+                },
+                Roles: []string{auth.RoleUser}
+            }
+
+            saved, err := u.QueryByID(ctx, traceID, claims, usr.ID)
+
+            if e rr != nil {
+                t.Fatalf("\t%s\tTest %d\tShould be able to retrieve user by ID : %s.", tests.Failed, testID, err)
+            }
+            t.Logf("\t%s\tTest %d\tShould be able to retrieve user by ID.", tests.Success, testID)
+
+            if diff := cmp.Diff(usr, saved); diff != nil {
+                t.Fatalf("\t%s\tTest %d:\t Should get abck the save user, Diff:\n%s", tests.Failed, testID, err)
+            }
+            t.Logf("\t%s\tTest %d:\t Should get abck the save user.", tests.Success, testID)
 
 
-func startContainer(t *testing.T, image string, port string, args ...string) *Container {
-    arg := []string{"run", "-P", "-d"}
-    arg = append(arg, args...)
-    arg = append(arg, image)
+            upd := user.UpdateUser{
+                Name: tests.StringPointer("yaowenqiang"),
+                Email: tests.StringPointer("yaowenqiang111@gmail.com"),
+            }
 
-    cmd := exec.Command("docker", arg...)
+            if err := u.Update(ctx, traceID, claims, user.ID, upd, now); err !- nil {
+                t.Fatalf("\t%s\tTest %d:\t Should be able to update user : %s.", tests.Failed, testID, err)
+            }
+            t.Fatalf("\t%s\tTest %d:\t Should be able to update user.", tests.Success, testID)
 
-    var out bytes.Buffer
-    cmd.Stdout = &out
 
-    if err := cmd.Run(); err  != nil {
-        t.Fatalf("could not start container %s : %v", image, err)
+            saved, err := u.QueryByEmail(ctx, traceID, claims, *upd.Email)
+
+            if err != nil {
+                t.Fatalf("\t%s\tTest %d:\t Should be able to retrieve user by Email : %s.", tests.Failed, testID, err)
+            }
+            t.Fatalf("\t%s\tTest %d:\t Should be able to retrieve user by Email.", tests.Success, testID)
+
+
+            if saved.Name != *upd.Name {
+                t.Errorf("\t%s\tTest %d:\t Should be able to see updates to Name.", tests.Failed, testID)
+                t.Logf("\t\tTest %d:\tGot : %v", testID, saved.Name)
+                t.Logf("\t\tTest %d:\tExp : %v", testID, *upd.Name)
+            } else {
+                t.Logf("\t%s\tTest %d:\t Should be able to see updates to Name.", tests.Success, testID)
+            }
+
+            if saved.Email != *upd.Email {
+                t.Errorf("\t%s\tTest %d:\t Should be able to see updates to Email.", tests.Failed, testID)
+                t.Logf("\t\tTest %d:\tGot : %v", testID, saved.Email)
+                t.Logf("\t\tTest %d:\tExp : %v", testID, *upd.Email)
+            } else {
+                t.Logf("\t%s\tTest %d:\t Should be able to see updates to Email.", tests.Success, testID)
+            }
+
+            if err := u.Delete(ctx, traceID, usr.ID); err != nil {
+                t.Fatalf("\t%s\tTest %d:\t Should be able to delete user : %s..", tests.Failed, testID, err)
+            }
+            t.Logf("\t%s\tTest %d:\t Should be able to delete user.", tests.Success, testID)
+
+
+            _, err := u.QueryByID(ctx, traceID, claims, usr.ID)
+
+            if errors.Cause(err) != usr.ErrNotFound {
+                t.Errorf("\t%s\tTest %d:\t Should NOT be able to retrieve  user : %s.", tests.Failed, testID, err)
+            }
+            t.Logf("\t%s\tTest %d:\t Should NOT be able to retrieve  user.", tests.Success, testID)
+        }
     }
-
-    id := out.String()[:12]
-    cmd = exec.Command("docker", "inspect", id)
-
-    out.Reset()
-
-    cmd.Stdout = &out
-
-    if err := cmd.Run(); err != nil {
-        t.Fatalf("could not inspect container %s : %v", image, err)
-    }
-
-    var doc []map[string]interface{}
-    if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
-        t.Fatalf("could not decode  json  %v",  err)
-    }
-
-    ip, randPort := extractIPPort(t, doc, port)
-
-    c := Container{
-        ID: id,
-        Host: net.JoinHostPort(ip, randPort),
-    }
-
-    t.Logf("Image:            %s", image)
-    t.Logf("ContainerID:      %s", c.ID)
-    t.Logf("Host:             %s", c.Host)
-
-    return &c
-
-}
-
-func stopContainer(t *testing.T, id string) {
-    if err := exec.Command("docker", "stop", id).Run(); err != nil {
-        t.Fatalf("could not stop container %s : %v", id, err)
-    }
-    t.Log("Stopped", id)
-
-    if err := exec.Command("docker", "rm", id, "-v").Run(); err != nil {
-        t.Fatalf("could not remove container %s : %v", id, err)
-    }
-    t.Log("Removed", id)
-
-}
-
-func dumpContainerLogs(t *testing.T, id string) {
-    out ,err := exec.Command("docker", "logs" , id).CombinedOutput()
-    if err != nil {
-        t.Fatalf("could not log container %s : %v", id, err)
-    }
-    t.Logf("logs for %s\n%s", id, out)
-}
-
-func extractIPPort(t *testing.T, doc []map[string]interface{}, port string) (string, string) {
-    nw, exists := doc[0]["NetworkSettings"]
-    if !exists {
-        t.Fatal("could not get network settings")
-    }
-    ports, exists := nw.(map[string]interface{})["ports"]
-    if !exists {
-        t.Fatal("could not get network port settings")
-    }
-    tcp, exists := ports.(map[string]interface{})[port + "/tcp"]
-    if !exists {
-        t.Fatal("could not get network ports/tcp settings")
-    }
-    list, exists := tcp.([]interface{})
-    if !exists {
-        t.Fatal("could not get network ports/tcp list settings")
-    }
-    if len(list) != 1 {
-        t.Fatal("could not get network ports/tcp list settings")
-    }
-    data, exists := list[0].(map[string]interface{})
-    if !exists {
-        t.Fatal("could not get network ports/tcp list data")
-    }
-
-    return data["HostIp"].(string), data["HostPort"].(string)
-}
-
-
-func TestHelloWorld(t *testing.T) {
-	t.Fatal("not implemented")
 }
