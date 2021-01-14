@@ -2,13 +2,18 @@ package user_test
 
 import (
     "testing"
+    "time"
     "github.com/yaowenqiang/service/business/tests"
+    "github.com/yaowenqiang/service/business/data/user"
+    "github.com/yaowenqiang/service/business/auth"
     "github.com/google/go-cmp/cmp"
+    "github.com/dgrijalva/jwt-go"
+    "github.com/pkg/errors"
 )
 
 
 func TestUser(t *testing.T) {
-    log, db, teardown := tests.NewUnit()
+    log, db, teardown := tests.NewUnit(t)
     t.Cleanup(teardown)
 
     u := user.New(log, db)
@@ -27,14 +32,14 @@ func TestUser(t *testing.T) {
                 Email: "yaowenqiang1111@163.com",
                 Roles: []string{auth.RoleAdmin},
                 Password: "gophers",
-                passwordConfirm: "gophers"
+                PasswordConfirm: "gophers",
             }
 
             usr, err := u.Create(ctx, traceID, nu, now)
             if err != nil {
-                t.Fataf("\t%s\tTest %d:\tShould be able to create user : %s", tests.Failed, testId, err)
+                t.Fatalf("\t%s\tTest %d:\tShould be able to create user : %s", tests.Failed, testID, err)
             }
-            t.Logf("\t%s\tTest %d:\tShould be able to create user", tests.Failed, testId)
+            t.Logf("\t%s\tTest %d:\tShould be able to create user", tests.Success, testID)
 
             claims := auth.Claims{
                 StandardClaims: jwt.StandardClaims{
@@ -44,17 +49,17 @@ func TestUser(t *testing.T) {
                     ExpiresAt: now.Add(time.Hour).Unix(),
                     IssuedAt: now.Unix(),
                 },
-                Roles: []string{auth.RoleUser}
+                Roles: []string{auth.RoleUser},
             }
 
             saved, err := u.QueryByID(ctx, traceID, claims, usr.ID)
 
-            if e rr != nil {
+            if err != nil {
                 t.Fatalf("\t%s\tTest %d\tShould be able to retrieve user by ID : %s.", tests.Failed, testID, err)
             }
             t.Logf("\t%s\tTest %d\tShould be able to retrieve user by ID.", tests.Success, testID)
 
-            if diff := cmp.Diff(usr, saved); diff != nil {
+            if diff := cmp.Diff(usr, saved); diff != "" {
                 t.Fatalf("\t%s\tTest %d:\t Should get abck the save user, Diff:\n%s", tests.Failed, testID, err)
             }
             t.Logf("\t%s\tTest %d:\t Should get abck the save user.", tests.Success, testID)
@@ -65,18 +70,18 @@ func TestUser(t *testing.T) {
                 Email: tests.StringPointer("yaowenqiang111@gmail.com"),
             }
 
-            if err := u.Update(ctx, traceID, claims, user.ID, upd, now); err !- nil {
+            if err := u.Update(ctx, traceID, claims, usr.ID, upd, now); err != nil {
                 t.Fatalf("\t%s\tTest %d:\t Should be able to update user : %s.", tests.Failed, testID, err)
             }
-            t.Fatalf("\t%s\tTest %d:\t Should be able to update user.", tests.Success, testID)
+            t.Logf("\t%s\tTest %d:\t Should be able to update user.", tests.Success, testID)
 
 
-            saved, err := u.QueryByEmail(ctx, traceID, claims, *upd.Email)
+            saved, err = u.QueryByEmail(ctx, traceID, claims, *upd.Email)
 
             if err != nil {
                 t.Fatalf("\t%s\tTest %d:\t Should be able to retrieve user by Email : %s.", tests.Failed, testID, err)
             }
-            t.Fatalf("\t%s\tTest %d:\t Should be able to retrieve user by Email.", tests.Success, testID)
+            t.Logf("\t%s\tTest %d:\t Should be able to retrieve user by Email.", tests.Success, testID)
 
 
             if saved.Name != *upd.Name {
@@ -101,9 +106,9 @@ func TestUser(t *testing.T) {
             t.Logf("\t%s\tTest %d:\t Should be able to delete user.", tests.Success, testID)
 
 
-            _, err := u.QueryByID(ctx, traceID, claims, usr.ID)
+            _, err = u.QueryByID(ctx, traceID, claims, usr.ID)
 
-            if errors.Cause(err) != usr.ErrNotFound {
+            if errors.Cause(err) != user.ErrNotFound {
                 t.Errorf("\t%s\tTest %d:\t Should NOT be able to retrieve  user : %s.", tests.Failed, testID, err)
             }
             t.Logf("\t%s\tTest %d:\t Should NOT be able to retrieve  user.", tests.Success, testID)

@@ -1,4 +1,17 @@
 package tests
+import (
+    "testing"
+    "log"
+    "os"
+    "context"
+    "time"
+	"github.com/jmoiron/sqlx"
+	"github.com/google/uuid"
+	"github.com/yaowenqiang/service/foundation/database"
+	"github.com/yaowenqiang/service/foundation/web"
+	"github.com/yaowenqiang/service/business/data/schema"
+)
+
 
 const (
     Success = "\u2713"
@@ -38,7 +51,7 @@ func NewUnit(t *testing.T) (*log.Logger, *sqlx.DB, func()) {
         if pingError == nil {
             break
         }
-        time.Sleep(time.Duration(attempted) * 100 * Millisecond)
+        time.Sleep(time.Duration(attempted) * 100 * time.Millisecond)
     }
 
     if pingError != nil {

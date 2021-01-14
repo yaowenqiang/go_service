@@ -56,3 +56,8 @@
 > docker pull postgres:13-alpine
 > docker pull openzipkin/zipkin:2.23
 > docker pull alpine:3.12.3
+
+# test 
+> go test -cover
+> go test -coverprofile cover.out
+> go tool cover -html cover.out

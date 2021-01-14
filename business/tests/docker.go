@@ -84,7 +84,7 @@ func extractIPPort(t *testing.T, doc []map[string]interface{}, port string) (str
     if !exists {
         t.Fatal("could not get network settings")
     }
-    ports, exists := nw.(map[string]interface{})["ports"]
+    ports, exists := nw.(map[string]interface{})["Ports"]
     if !exists {
         t.Fatal("could not get network port settings")
     }

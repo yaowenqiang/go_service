@@ -61,7 +61,7 @@ func (u User) Create(ctx context.Context, traceID string, nu NewUser, now time.T
 		database.Log(q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.Roles, usr.DateCreated, usr.DateUpdated),
 	)
 
-	if _, err = u.db.ExecContext(ctx, q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.DateCreated, usr.DateUpdated); err != nil {
+	if _, err = u.db.ExecContext(ctx, q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.Roles, usr.DateCreated, usr.DateUpdated); err != nil {
 		return Info{}, errors.Wrap(err, "inserting user")
 	}
 
@@ -104,10 +104,10 @@ func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, us
 	`
 
 	u.log.Printf("%s : %s : query : %s", traceID, "user.Update",
-		database.Log(q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.Roles, usr.DateUpdated),
+		database.Log(q, usr.ID, usr.Name, usr.Email, usr.Roles,usr.PasswordHash, usr.DateUpdated),
 	)
 
-	if _, err = u.db.ExecContext(ctx, q, usr.ID, usr.Name, usr.Email, usr.PasswordHash, usr.DateUpdated); err != nil {
+	if _, err = u.db.ExecContext(ctx, q, usr.ID, usr.Name, usr.Email, usr.Roles, usr.PasswordHash, usr.DateUpdated); err != nil {
 		return errors.Wrap(err, "inserting user")
 	}
 
@@ -157,14 +157,14 @@ func (u User) QueryByID(ctx context.Context, traceID string, claims auth.Claims,
 		return Info{}, ErrForbidden
 	}
 
-	const q = "SELECT * FROM users where user_id = %1"
+	const q = "SELECT * FROM users where user_id = $1"
 	u.log.Printf("%s : %s : query : %s", traceID, "user.QueryById",
 		database.Log(q, userID),
 	)
 
 	var usr Info
 
-	if err := u.db.SelectContext(ctx, &usr, q, userID); err != nil {
+	if err := u.db.GetContext(ctx, &usr, q, userID); err != nil {
 		if err == sql.ErrNoRows {
 			return Info{}, ErrNotFound
 		}
@@ -176,14 +176,14 @@ func (u User) QueryByID(ctx context.Context, traceID string, claims auth.Claims,
 
 func (u User) QueryByEmail(ctx context.Context, traceID string, claims auth.Claims, email string) (Info, error) {
 
-	const q = "SELECT * FROM users where email = %1"
+	const q = "SELECT * FROM users where email = $1"
 	u.log.Printf("%s : %s : query : %s", traceID, "user.QueryByEmail",
 		database.Log(q, email),
 	)
 
 	var usr Info
 
-	if err := u.db.SelectContext(ctx, &usr, q, email); err != nil {
+	if err := u.db.GetContext(ctx, &usr, q, email); err != nil {
 		if err == sql.ErrNoRows {
 			return Info{}, ErrNotFound
 		}
