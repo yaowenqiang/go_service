@@ -3,14 +3,16 @@ package user
 import (
 	"context"
 	"database/sql"
+	"log"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/yaowenqiang/service/foundation/database"
 	"github.com/yaowenqiang/service/business/auth"
-	"log"
-	"time"
+	"github.com/dgrijalva/jwt-go"
 )
 
 var (
@@ -114,9 +116,13 @@ func (u User) Update(ctx context.Context, traceID string, claims auth.Claims, us
 	return nil
 }
 
-func (u User) Delete(ctx context.Context, traceID string, userID string) error {
+func (u User) Delete(ctx context.Context, traceID string, claims auth.Claims, userID string) error {
 	if _, err := uuid.Parse(userID); err != nil {
 		return ErrInvalidID
+	}
+
+	if !claims.Authorized(auth.RoleAdmin) && claims.Subject != userID {
+		return ErrForbidden
 	}
 
 	const q = "DELETE from users where user_id = $1"
@@ -196,4 +202,51 @@ func (u User) QueryByEmail(ctx context.Context, traceID string, claims auth.Clai
 	}
 
 	return usr, nil
+}
+
+func (u User) Authenticate(ctx context.Context, traceID string, now time.Time, email, password string) (auth.Claims, error) {
+	const q = `
+	SELECT
+		*
+	FROM
+		users
+	WHERE
+		email = $1`
+
+	u.log.Printf("%s: %s: %s", traceID, "user.Authenticate",
+		database.Log(q, email),
+	)
+
+	var usr Info
+	if err := u.db.GetContext(ctx, &usr, q, email); err != nil {
+
+		// Normally we would return ErrNotFound in this scenario but we do not want
+		// to leak to an unauthenticated user which emails are in the system.
+		if err == sql.ErrNoRows {
+			return auth.Claims{}, ErrAuthenticationFailure
+		}
+
+		return auth.Claims{}, errors.Wrap(err, "selecting single user")
+	}
+
+	// Compare the provided password with the saved hash. Use the bcrypt
+	// comparison function so it is cryptographically secure.
+	if err := bcrypt.CompareHashAndPassword(usr.PasswordHash, []byte(password)); err != nil {
+		return auth.Claims{}, ErrAuthenticationFailure
+	}
+
+	// If we are this far the request is valid. Create some claims for the user
+	// and generate their token.
+	claims := auth.Claims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:    "service project",
+			Subject:   usr.ID,
+			Audience:  "students",
+			ExpiresAt: now.Add(time.Hour).Unix(),
+			IssuedAt:  now.Unix(),
+		},
+		Roles: usr.Roles,
+	}
+
+	return claims, nil
 }

@@ -3,7 +3,7 @@ package mid
 import (
 
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -43,7 +43,7 @@ func Authenticate(a *auth.Auth) web.Middleware {
 }
 
 
-func Authorize(log *log.Logger, roles ...string) web.Middleware {
+func Authorize(roles ...string) web.Middleware {
 	m := func(handler web.Handler) web.Handler {
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 				claims, ok := ctx.Value(auth.Key).(auth.Claims)
@@ -51,9 +51,10 @@ func Authorize(log *log.Logger, roles ...string) web.Middleware {
 					return errors.New("claims missing from context")
 				}
 
-				if !claims.Authorize(roles...) {
-					log.Printf("mid: authorize: claims: %v exp: %v", claims.Roles, roles)
-					return ErrForbidden
+				if !claims.Authorized(roles...) {
+					return web.NewRequestError(
+							fmt.Errorf("you are not authorized for that action : claims: %v, exp: %v", claims.Roles, roles),
+							http.StatusForbidden)
 				}
 				return handler(ctx, w, r)
 			}
