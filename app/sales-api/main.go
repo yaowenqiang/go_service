@@ -20,6 +20,9 @@ import (
 	"github.com/yaowenqiang/service/business/auth"
 	"github.com/yaowenqiang/service/foundation/database"
     "github.com/dgrijalva/jwt-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/trace/zipkin"
+	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 /*
@@ -61,6 +64,11 @@ func run(log *log.Logger) error{
 			Host         	string        `conf:"default:localhost"`
 			Name         	string        `conf:"default:postgres"`
 			DisableTLS      bool          `conf:"default:true"`
+		}
+		Zipkin struct {
+		ReportURI string `conf:"default:http://0.0.0.0:9411/api/v2/spans"`
+		ServiceName string `conf:"default:sales-api"`
+		Probability float64 `conf:"default:0.05"`
 		}
 		Auth struct {
 			KeyID         		string        `conf:"default:asdlfjldasjfdsjfldasjfl jlsjflweqjio;ewjejf"`
@@ -154,6 +162,30 @@ func run(log *log.Logger) error{
 		Name: cfg.DB.Name,
 		DisableTLS: cfg.DB.DisableTLS,
 	})
+
+	// Start Tracing Support
+
+	log.Println("main: Intialization OT/Zipkin tracing support")
+
+	exporter, err := zipkin.NewRawExporter(
+		cfg.Zipkin.ReportURI,
+		cfg.Zipkin.ServiceName,
+		zipkin.WithLogger(log),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "creating new exporter")
+	}
+	tp := trace.NewTracerProvider(
+		trace.WithConfig(trace.Config{DefaultSampler: trace.TraceIDRatioBased(cfg.Zipkin.Probability)}),
+		trace.WithBatcher(exporter,
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+			trace.WithBatchTimeout(trace.DefaultBatchTimeout),
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+		),
+	)
+
+	otel.SetTracerProvider(tp)
 
 	if err != nil {
 		return errors.Wrap(err, "connecting to db")

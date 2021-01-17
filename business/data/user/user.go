@@ -13,6 +13,7 @@ import (
 	"github.com/yaowenqiang/service/foundation/database"
 	"github.com/yaowenqiang/service/business/auth"
 	"github.com/dgrijalva/jwt-go"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -139,6 +140,10 @@ func (u User) Delete(ctx context.Context, traceID string, claims auth.Claims, us
 }
 
 func (u User) Query(ctx context.Context, traceID string, pageNumber int, rowsPerPage int) ([]Info, error) {
+
+   ctx, span := trace.SpanFromContext(ctx).Tracer().Start(ctx, "business.data.user.query")
+   defer span.End()
+
 	const q = "SELECT * FROM users ORDER BY user_id OFFSET $1 ROWS FETCH NEXT $2 ROWS ONLY"
 	offset := (pageNumber - 1) * rowsPerPage
 	u.log.Printf("%s : %s : query : %s", traceID, "user.Query",

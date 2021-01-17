@@ -6,6 +6,7 @@ import  (
     "runtime"
     "net/http"
     "github.com/yaowenqiang/service/foundation/web"
+	"go.opentelemetry.io/otel/trace"
 )
 
 
@@ -24,6 +25,8 @@ func Metrics() web.Middleware {
     m := func(handler web.Handler) web.Handler {
 
        h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+           ctx, span := trace.SpanFromContext(ctx).Tracer().Start(ctx, "business.mid.metrics")
+           defer span.End()
            err := handler(ctx, w, r)
            m.req.Add(1)
 

@@ -7,7 +7,8 @@ import (
     "os"
     "net/http"
     "github.com/dimfeld/httptreemux/v5"
-    "github.com/google/uuid"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ctxKey int
@@ -22,7 +23,8 @@ type Values struct {
 
 
 type App struct {
-    *httptreemux.ContextMux
+    mux *httptreemux.ContextMux
+    otmux http.Handler
     shutdown chan os.Signal
     mw []Middleware
 }
@@ -30,12 +32,19 @@ type App struct {
 type Handler  func(ctx context.Context, w http.ResponseWriter, r *http.Request) error
 
 func NewApp(shutdown chan os.Signal, mw ...Middleware) *App {
-    app := App{
-        ContextMux: httptreemux.NewContextMux(),
+    mux := httptreemux.NewContextMux()
+    return &App{
+        mux:mux,
+    // https://w3c.github.io/trace-context/
+        otmux: otelhttp.NewHandler(mux, "request"),
         shutdown: shutdown,
         mw: mw,
     }
-    return &app
+
+}
+
+func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    a.otmux.ServeHTTP(w, r)
 }
 
 func (a *App) Handle(method string, path string, handler Handler, mw ...Middleware) {
@@ -47,12 +56,16 @@ func (a *App) Handle(method string, path string, handler Handler, mw ...Middlewa
     h := func(w http.ResponseWriter, r *http.Request) {
         //BOILERPLAE
 
+        ctx := r.Context()
+		ctx, span := trace.SpanFromContext(ctx).Tracer().Start(ctx, r.URL.Path)
+        defer span.End()
+
         v := Values{
-            TraceID: uuid.New().String(),
+            TraceID: span.SpanContext().TraceID.String(),
             Now: time.Now(),
         }
 
-        ctx := context.WithValue(r.Context(), KeyValues, &v)
+        ctx = context.WithValue(ctx, KeyValues, &v)
 
 
         if err := handler(ctx, w, r); err != nil {
@@ -62,7 +75,7 @@ func (a *App) Handle(method string, path string, handler Handler, mw ...Middlewa
 
         //BOILERPLAE
     }
-    a.ContextMux.Handle(method, path, h)
+    a.mux.Handle(method, path, h)
 }
 
 

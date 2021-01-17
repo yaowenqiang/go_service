@@ -10,6 +10,7 @@ import (
 	"github.com/yaowenqiang/service/business/auth"
 	"github.com/yaowenqiang/service/foundation/web"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var ErrForbidden = web.NewRequestError(
@@ -21,7 +22,9 @@ var ErrForbidden = web.NewRequestError(
 func Authenticate(a *auth.Auth) web.Middleware {
 	m := func(handler web.Handler) web.Handler {
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-			authStr := r.Header.Get("authorization")
+			ctx, span := trace.SpanFromContext(ctx).Tracer().Start(ctx, "business.mid.authencate")
+				defer span.End()
+				authStr := r.Header.Get("authorization")
 			parts := strings.Split(authStr, " ")
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 				err := errors.New("expected authorization header format: bearer <token>")
@@ -46,6 +49,8 @@ func Authenticate(a *auth.Auth) web.Middleware {
 func Authorize(roles ...string) web.Middleware {
 	m := func(handler web.Handler) web.Handler {
 		h := func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+			ctx, span := trace.SpanFromContext(ctx).Tracer().Start(ctx, "business.mid.authorize")
+				defer span.End()
 				claims, ok := ctx.Value(auth.Key).(auth.Claims)
 				if !ok {
 					return errors.New("claims missing from context")

@@ -61,3 +61,7 @@
 > go test -cover
 > go test -coverprofile cover.out
 > go tool cover -html cover.out
+> go test -run TestUsers/crud -v
+
+
+> expvarmon -ports=":4000" -vars="build,requests,goroutines,errors,mem:memstats.Alloc"
